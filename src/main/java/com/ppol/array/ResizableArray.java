@@ -7,8 +7,9 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 
 public final class ResizableArray<E> extends AbstractCollection<E> {
 
-    private final AtomicReferenceArray<AtomicReferenceArray<E>> memory = new AtomicReferenceArray<>(16);
     private static final int FIRST_BUCKET_SIZE = 2;
+    
+    private final AtomicReferenceArray<AtomicReferenceArray<E>> memory = new AtomicReferenceArray<>(16);
     private AtomicReference<ResizableArray.Descriptor> currentDescriptor;
 
     public ResizableArray() {
