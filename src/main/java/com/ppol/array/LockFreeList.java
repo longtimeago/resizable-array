@@ -1,29 +1,29 @@
 package com.ppol.array;
 
-import java.util.AbstractCollection;
+import java.util.AbstractList;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 
-public final class ResizableArray<E> extends AbstractCollection<E> {
+public final class LockFreeList<E> extends AbstractList<E> {
 
     private static final int FIRST_BUCKET_SIZE = 2;
-    
-    private final AtomicReferenceArray<AtomicReferenceArray<E>> memory = new AtomicReferenceArray<>(16);
-    private AtomicReference<ResizableArray.Descriptor> currentDescriptor;
 
-    public ResizableArray() {
+    private final AtomicReferenceArray<AtomicReferenceArray<E>> memory = new AtomicReferenceArray<>(16);
+    private AtomicReference<LockFreeList.Descriptor> currentDescriptor;
+
+    public LockFreeList() {
         super();
         final WriteOperation operation = new WriteOperation(0, null, null);
         operation.setPendingFlag(false);
-        this.currentDescriptor = new AtomicReference<>(new ResizableArray.Descriptor(0, operation));
-        this.memory.set(0, new AtomicReferenceArray<E>(ResizableArray.FIRST_BUCKET_SIZE));
+        this.currentDescriptor = new AtomicReference<>(new LockFreeList.Descriptor(0, operation));
+        this.memory.set(0, new AtomicReferenceArray<E>(LockFreeList.FIRST_BUCKET_SIZE));
     }
 
     @Override
     public boolean add(final E obj) {
-        ResizableArray.Descriptor current;
-        ResizableArray.Descriptor newD;
+        LockFreeList.Descriptor current;
+        LockFreeList.Descriptor newD;
         do {
             current = currentDescriptor.get();
             if (current.getWo().isPending()) {
@@ -32,10 +32,33 @@ public final class ResizableArray<E> extends AbstractCollection<E> {
             this.allocateBucketIfNeeded(current.getSize());
             WriteOperation wo = new WriteOperation(current.getSize(), null, obj);
             wo.setPendingFlag(true);
-            newD = new ResizableArray.Descriptor(current.getSize() + 1, wo);
+            newD = new LockFreeList.Descriptor(current.getSize() + 1, wo);
         } while (!this.currentDescriptor.compareAndSet(current, newD));
         this.write(currentDescriptor.get().getWo());
         return true;
+    }
+
+    @Override
+    public E get(final int index) {
+        final int bucketId = bucketId(index);
+        final int indexInsideBucket = indexInsideBucket(index, bucketId);
+        final AtomicReferenceArray<E> bucket = this.memory.get(bucketId);
+        if (bucket == null || indexInsideBucket >= bucket.length()) {
+            throw new IndexOutOfBoundsException();
+        }
+        return bucket.get(indexInsideBucket);
+    }
+
+    @Override
+    public E set(final int index, final E element) {
+        final int bucketId = bucketId(index);
+        final int indexInsideBucket = indexInsideBucket(index, bucketId);
+        final AtomicReferenceArray<E> bucket = this.memory.get(bucketId);
+        if (bucket == null || indexInsideBucket >= bucket.length()) {
+            throw new IndexOutOfBoundsException();
+        }
+        return this.memory.get(bucketId)
+            .getAndSet(indexInsideBucket, element);
     }
 
     private void write(final WriteOperation wo) {
@@ -60,7 +83,7 @@ public final class ResizableArray<E> extends AbstractCollection<E> {
     }
 
     private int bucketId(final int size) {
-        final int hibit = Integer.highestOneBit(size + ResizableArray.FIRST_BUCKET_SIZE);
+        final int hibit = Integer.highestOneBit(size + LockFreeList.FIRST_BUCKET_SIZE);
         if (hibit == 0) {
             return 0;
         }
@@ -68,7 +91,7 @@ public final class ResizableArray<E> extends AbstractCollection<E> {
     }
 
     private int indexInsideBucket(final int globalIndex, final int bucketId) {
-        final int pos = globalIndex + ResizableArray.FIRST_BUCKET_SIZE;
+        final int pos = globalIndex + LockFreeList.FIRST_BUCKET_SIZE;
         return pos ^ 1 << bucketId + 1;
     }
 
@@ -88,7 +111,7 @@ public final class ResizableArray<E> extends AbstractCollection<E> {
 
     private class ArrayIterator<E> implements Iterator<E> {
         private int index;
-        private int size = ResizableArray.this.size();
+        private int size = LockFreeList.this.size();
 
         @Override
         public boolean hasNext() {
@@ -97,8 +120,8 @@ public final class ResizableArray<E> extends AbstractCollection<E> {
 
         @Override
         public E next() {
-            final int bucketId = ResizableArray.this.bucketId(this.index);
-            return (E) ResizableArray.this.memory.get(bucketId(index))
+            final int bucketId = LockFreeList.this.bucketId(this.index);
+            return (E) LockFreeList.this.memory.get(bucketId(index))
                 .get(indexInsideBucket(index++, bucketId));
         }
 
@@ -109,14 +132,14 @@ public final class ResizableArray<E> extends AbstractCollection<E> {
     }
 
     private static class Descriptor {
-        private final ResizableArray.WriteOperation wo;
+        private final LockFreeList.WriteOperation wo;
         private final int size;
 
-        private Descriptor(final int size, final ResizableArray.WriteOperation wo) {
+        private Descriptor(final int size, final LockFreeList.WriteOperation wo) {
             this.wo = wo;
             this.size = size;
         }
-        public ResizableArray.WriteOperation getWo() {
+        public LockFreeList.WriteOperation getWo() {
             return this.wo;
         }
         public int getSize() {

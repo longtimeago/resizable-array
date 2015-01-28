@@ -11,13 +11,13 @@ import org.hamcrest.Matchers;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
-public final class ResizableArrayCorrectnessTest {
-    private ResizableArray<String> collection = new ResizableArray<>();
+public final class LockFreeListCorrectnessTest {
+    private LockFreeList<String> collection = new LockFreeList<>();
 
     @ThreadedBefore
     public void before() {
         System.out.println("ThreadedBefore");
-        this.collection = new ResizableArray<>();
+        this.collection = new LockFreeList<>();
     }
 
     @ThreadedMain
@@ -43,6 +43,6 @@ public final class ResizableArrayCorrectnessTest {
     @Test
     public void testResizableArray() {
         final AnnotatedTestRunner runner = new AnnotatedTestRunner();
-        runner.runTests(this.getClass(), ResizableArray.class);
+        runner.runTests(this.getClass(), LockFreeList.class);
     }
 }

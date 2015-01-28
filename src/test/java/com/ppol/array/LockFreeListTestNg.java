@@ -9,9 +9,9 @@ import org.testng.annotations.Test;
 /**
  * Concurrent calls
  */
-public final class ResizableArrayTestNg {
+public final class LockFreeListTestNg {
 
-    private final Collection<String> collection = new ResizableArray<>();
+    private final Collection<String> collection = new LockFreeList<>();
 
     @Test(invocationCount = 2000, threadPoolSize = 8)
     public void testAddConcurrently() {
